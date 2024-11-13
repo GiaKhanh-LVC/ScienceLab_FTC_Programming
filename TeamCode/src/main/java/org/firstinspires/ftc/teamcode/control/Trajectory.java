@@ -1,12 +1,15 @@
 package org.firstinspires.ftc.teamcode.control;
 
+import com.acmerobotics.roadrunner.Pose2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+
+import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
 public class Trajectory {
     public class MyOpmode extends LinearOpMode {
         @Override
         public void runOpMode() {
-            SampleMecanumDrive drive = new SampleMecanumDrive(hardwareMap);
+            MecanumDrive drive = new MecanumDrive(hardwareMap);
 
             Trajectory myTrajectory = drive.trajectoryBuilder(new Pose2d())
                     .strafeRight(10)

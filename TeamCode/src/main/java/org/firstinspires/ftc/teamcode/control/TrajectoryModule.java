@@ -39,15 +39,7 @@ public class TrajectoryModule extends LinearOpMode {
 
         // Build the trajectory
         TrajectoryActionBuilder myTrajectory =  drive.actionBuilder(startPose)
-                .lineToYSplineHeading(33, Math.toRadians(0))
-                .waitSeconds(2)
-                .setTangent(Math.toRadians(90))
-                .lineToY(48)
-                .setTangent(Math.toRadians(0))
-                .lineToX(32)
-                .strafeTo(new Vector2d(positionX, positionY))
-                .turn(Math.toRadians(180))
-                .lineToX(47.5)
+                .splineTo(new Vector2d(positionX, positionY), targetPose.heading)
                 .waitSeconds(3);
 
 

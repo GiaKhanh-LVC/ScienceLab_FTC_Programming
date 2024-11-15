@@ -18,14 +18,14 @@ public class ServoControlModule {
     // Method to close the claw
     public void closeClaw( Servo servo) {
         if (servo != null) {
-            servo.setPosition(0.0); // Position for closed claw
+            servo.setPosition(1.0); // Position for closed claw
         }
     }
 
     // Method to open the claw
     public void openClaw(Servo servo) {
         if (servo != null) {
-            servo.setPosition(1.0); // Position for open claw
+            servo.setPosition(0.0); // Position for open claw
         }
     }
 

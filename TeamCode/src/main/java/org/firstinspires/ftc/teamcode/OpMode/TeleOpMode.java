@@ -14,15 +14,6 @@ public class TeleOpMode extends OpMode {
 
     @Override
     public void init() {
-//        leftFront = new MotorControlModule();
-//        rightFront= new MotorControlModule();
-//        leftRear= new MotorControlModule();
-//        rightRear = new MotorControlModule();
-//        ///////////////////////
-//        leftFront.LeftFront();
-//        rightFront.RightFront();
-//        leftRear.LeftRear();
-//        rightRear.RightRear();
         MotorControlModule mcm = new MotorControlModule();
         leftFront = mcm.leftFront;
         rightFront = mcm.rightFront;

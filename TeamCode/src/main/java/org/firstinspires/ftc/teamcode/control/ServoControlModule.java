@@ -1,29 +1,38 @@
 package org.firstinspires.ftc.teamcode.control;
 
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.Servo;
+import static org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion.hardwareMap;
+public class ServoControlModule {
+    private Servo servo1;
+    private Servo servo2;
+    // Constructor that takes HardwareMap and servo name to initialize the servo
+    public ServoControlModule() {
+        servo1 = hardwareMap.get(Servo.class, "servo claw 1");
+        servo1.setPosition(0.5); // Set initial position to center (optional)
+        servo1.setDirection(Servo.Direction.FORWARD);
+        servo2 = hardwareMap.get(Servo.class, "servo claw 2");
+        servo2.setPosition(0.5); // Set initial position to center (optional)
+        servo2.setDirection(Servo.Direction.FORWARD);
+    }
 
-public class ServoControlModule extends LinearOpMode {
-    private Servo servo1 ;
+    // Method to close the claw
+    public void closeClaw( Servo servo) {
+        if (servo != null) {
+            servo.setPosition(1.0); // Position for closed claw
+        }
+    }
 
-    @Override
-    public void runOpMode() {
-        // Khởi tạo servo
-        servo1 = hardwareMap.get(Servo.class, "servo_name");
+    // Method to open the claw
+    public void openClaw(Servo servo) {
+        if (servo != null) {
+            servo.setPosition(0.0); // Position for open claw
+        }
+    }
 
-        // Đợi lệnh bắt đầu từ trạm điều khiển
-        waitForStart();
-
-        // Vòng lặp chính
-        while (opModeIsActive()) {
-            // Đặt vị trí servo (0.0 đến 1.0 cho các servo tương thích FTC)
-            servo1.setPosition(0.5); // Đặt vị trí giữa
-
-            telemetry.addData("Servo Position", servo1.getPosition());
-            telemetry.update();
-
-            // Chờ
-            sleep(500);
+    // Optional: Method to set servo to an initial position (center position)
+    public void servoSetup(Servo servo) {
+        if (servo != null) {
+            servo.setPosition(0.5); // Center position
         }
     }
 }

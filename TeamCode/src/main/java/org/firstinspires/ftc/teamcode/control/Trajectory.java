@@ -3,7 +3,7 @@ package org.firstinspires.ftc.teamcode.control;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
-import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
+import org.firstinspires.ftc.teamcode.MecanumDrive;
 
 public class Trajectory {
     public class MyOpmode extends LinearOpMode {

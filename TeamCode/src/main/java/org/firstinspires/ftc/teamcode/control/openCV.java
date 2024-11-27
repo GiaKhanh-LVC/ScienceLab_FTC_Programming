@@ -16,129 +16,166 @@ import org.openftc.easyopencv.OpenCvPipeline;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @TeleOp(name = "OpenCV")
-class OpenCV extends LinearOpMode {
+public class openCV extends LinearOpMode {
 
-    double cX = 0;
-    double cY = 0;
-    double width = 0;
-
-    private OpenCvCamera controlHubCam;
-    private static final int CAMERA_WIDTH = 1289 ;
+    // kich thuoc camera
+    private static final int CAMERA_WIDTH = 1280;
     private static final int CAMERA_HEIGHT = 720;
 
-    // Calculate the distance using the formula
-    public static final double objectWidthInRealWorldUnits = 89 * 0.03937;
-    public static final double focalLength = ;
+    // thong so vat ly va camera
+    private static final double OBJECT_WIDTH_IN_REAL_WORLD_UNITS = 89 * 0.03937; // kich thuoc vat the
+    private static final double FOCAL_LENGTH = 700; // tieu cu
+
+    private OpenCvCamera controlHubCam;
 
     @Override
     public void runOpMode() {
-
         initOpenCV();
+
+        // cai dat telemetry va dashboard
         FtcDashboard dashboard = FtcDashboard.getInstance();
         telemetry = new MultipleTelemetry(telemetry, dashboard.getTelemetry());
-        FtcDashboard.getInstance().startCameraStream(controlHubCam, 30);
+        dashboard.startCameraStream(controlHubCam, 30);
 
         waitForStart();
 
         while (opModeIsActive()) {
-            telemetry.addData("Coordinate", "(" + (int) cX + ", " + (int) cY + ")");
-            telemetry.addData("Distance in Inch", (getDistance(width)));
             telemetry.update();
-            // The OpenCV pipeline automatically processes frames and handles detection
         }
-        // Release resources
+
+        // giai phong tai nguyen
         controlHubCam.stopStreaming();
     }
-    private void initOpenCV() {
 
-        // Create an instance of the camera
+    private void initOpenCV() {
         int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
                 "cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
 
-        // Use OpenCvCameraFactory class from FTC SDK to create camera instance
         controlHubCam = OpenCvCameraFactory.getInstance().createWebcam(
                 hardwareMap.get(WebcamName.class, "Webcam 1"), cameraMonitorViewId);
 
-        controlHubCam.setPipeline(new YellowBlobDetectionPipeline());
-        controlHubCam.openCameraDevice();
-        controlHubCam.startStreaming(CAMERA_WIDTH, CAMERA_HEIGHT, OpenCvCameraRotation.UPRIGHT);
+        controlHubCam.setPipeline(new MultiColorBlobDetectionPipeline());
+        controlHubCam.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
+            @Override
+            public void onOpened() {
+                controlHubCam.startStreaming(CAMERA_WIDTH, CAMERA_HEIGHT, OpenCvCameraRotation.UPRIGHT);
+            }
+
+            @Override
+            public void onError(int errorCode) {
+                telemetry.addData("Camera Error", errorCode);
+                telemetry.update();
+            }
+        });
     }
-    class YellowBlobDetectionPipeline extends OpenCvPipeline {
+
+    // pipline xu li khung hinh va nhan dien mau
+    static class MultiColorBlobDetectionPipeline extends OpenCvPipeline {
+
         @Override
         public Mat processFrame(Mat input) {
-            // Preprocess the frame to detect yellow regions
-            Mat yellowMask = preprocessFrame(input);
+            // tien xu li mat na cho cac mau
+            Mat yellowMask = preprocessFrame(input, new Scalar(20, 100, 100), new Scalar(30, 255, 255)); // vang
+            Mat redMask = preprocessRedFrame(input); // do
+            Mat blueMask = preprocessFrame(input, new Scalar(100, 150, 100), new Scalar(130, 255, 255)); // xanh nuoc bien
 
-            // Find contours of the detected yellow regions
-            List<MatOfPoint> contours = new ArrayList<>();
-            Mat hierarchy = new Mat();
-            Imgproc.findContours(yellowMask, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+            // xu li tung mau va chu thich mau
+            processColor(input, yellowMask, new Scalar(0, 255, 255), "Yellow");
+            processColor(input, redMask, new Scalar(0, 0, 255), "Red");
+            processColor(input, blueMask, new Scalar(255, 0, 0), "Blue");
 
-            // Find the largest yellow contour (blob)
-            MatOfPoint largestContour = findLargestContour(contours);
-
-            if (largestContour != null) {
-                // Draw a red outline around the largest detected object
-                Imgproc.drawContours(input, contours, contours.indexOf(largestContour), new Scalar(255, 0, 0), 2);
-                // Calculate the width of the bounding box
-                width = calculateWidth(largestContour);
-
-                // Display the width next to the label
-                String widthLabel = "Width: " + (int) width + " pixels";
-                Imgproc.putText(input, widthLabel, new Point(cX + 10, cY + 20), Imgproc.FONT_HERSHEY_SIMPLEX, 0.5, new Scalar(0, 255, 0), 2);
-                //Display the Distance
-                String distanceLabel = "Distance: " + String.format("%.2f", getDistance(width)) + " inches";
-                Imgproc.putText(input, distanceLabel, new Point(cX + 10, cY + 60), Imgproc.FONT_HERSHEY_SIMPLEX, 0.5, new Scalar(0, 255, 0), 2);
-                // Calculate the centroid of the largest contour
-                Moments moments = Imgproc.moments(largestContour);
-                cX = moments.get_m10() / moments.get_m00();
-                cY = moments.get_m01() / moments.get_m00();
-
-                // Draw a dot at the centroid
-                String label = "(" + (int) cX + ", " + (int) cY + ")";
-                Imgproc.putText(input, label, new Point(cX + 10, cY), Imgproc.FONT_HERSHEY_COMPLEX, 0.5, new Scalar(0, 255, 0), 2);
-                Imgproc.circle(input, new Point(cX, cY), 5, new Scalar(0, 255, 0), -1);
-            }
             return input;
         }
-        private Mat preprocessFrame(Mat frame) {
+
+        private Mat preprocessFrame(Mat frame, Scalar lowerBound, Scalar upperBound) {
             Mat hsvFrame = new Mat();
             Imgproc.cvtColor(frame, hsvFrame, Imgproc.COLOR_BGR2HSV);
 
-            Scalar lowerYellow = new Scalar(100, 100, 100);
-            Scalar upperYellow = new Scalar(180, 255, 255);
-
-            Mat yellowMask = new Mat();
-            Core.inRange(hsvFrame, lowerYellow, upperYellow, yellowMask);
+            Mat mask = new Mat();
+            Core.inRange(hsvFrame, lowerBound, upperBound, mask);
 
             Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5));
-            Imgproc.morphologyEx(yellowMask, yellowMask, Imgproc.MORPH_OPEN, kernel);
-            Imgproc.morphologyEx(yellowMask, yellowMask, Imgproc.MORPH_CLOSE, kernel);
+            Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN, kernel); // khu nhieu
+            Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel); // lam muot vung mask
 
-            return yellowMask;
+            return mask;
         }
+
+        private Mat preprocessRedFrame(Mat frame) {
+            Mat hsvFrame = new Mat();
+            Imgproc.cvtColor(frame, hsvFrame, Imgproc.COLOR_BGR2HSV);
+
+            // mau do co the nam trong hai khoang khong gian HSV
+            Mat lowerRedMask = new Mat();
+            Mat upperRedMask = new Mat();
+            Core.inRange(hsvFrame, new Scalar(0, 120, 100), new Scalar(10, 255, 255), lowerRedMask);
+            Core.inRange(hsvFrame, new Scalar(170, 120, 100), new Scalar(180, 255, 255), upperRedMask);
+
+            Mat redMask = new Mat();
+            Core.addWeighted(lowerRedMask, 1.0, upperRedMask, 1.0, 0.0, redMask);
+
+            Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5));
+            Imgproc.morphologyEx(redMask, redMask, Imgproc.MORPH_OPEN, kernel); // khu nhieu
+            Imgproc.morphologyEx(redMask, redMask, Imgproc.MORPH_CLOSE, kernel); // lam muot vung mask
+
+            return redMask;
+        }
+
+        private void processColor(Mat input, Mat mask, Scalar color, String label) {
+            // tim duong vien
+            List<MatOfPoint> contours = new ArrayList<>();
+            Mat hierarchy = new Mat();
+            Imgproc.findContours(mask, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+
+            MatOfPoint largestContour = findLargestContour(contours);
+
+            if (largestContour != null) {
+                Moments moments = Imgproc.moments(largestContour);
+                double cX = moments.get_m10() / moments.get_m00(); // toa do tam x
+                double cY = moments.get_m01() / moments.get_m00(); // toa do tam y
+                double detectedWidth = calculateWidth(largestContour); // chieu rong phan tu
+
+                // chu thich
+                Imgproc.drawContours(input, contours, contours.indexOf(largestContour), color, 2);
+                Imgproc.circle(input, new Point(cX, cY), 5, color, -1);
+
+                String widthLabel = label + " Width: " + (int) detectedWidth + " px";
+                String distanceLabel = label + " Distance: " +
+                        String.format(Locale.US, "%.2f", calculateDistance(detectedWidth)) + " in";
+
+                Imgproc.putText(input, widthLabel, new Point(cX + 10, cY + 20), Imgproc.FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
+                Imgproc.putText(input, distanceLabel, new Point(cX + 10, cY + 50), Imgproc.FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
+            }
+        }
+
         private MatOfPoint findLargestContour(List<MatOfPoint> contours) {
             double maxArea = 0;
             MatOfPoint largestContour = null;
 
             for (MatOfPoint contour : contours) {
-                double area = Imgproc.contourArea(contour);
+                double area = Imgproc.contourArea(contour); // dien tich duong vien
                 if (area > maxArea) {
                     maxArea = area;
                     largestContour = contour;
                 }
             }
+
             return largestContour;
         }
+
         private double calculateWidth(MatOfPoint contour) {
             Rect boundingRect = Imgproc.boundingRect(contour);
-            return boundingRect.width;
+            return boundingRect.width; // tra ve chieu rong hcn bao quanh
         }
-    }
-    private static double getDistance(double width){
-        double distance = (objectWidthInRealWorldUnits * focalLength) / width;
-        return distance;
+
+        private double calculateDistance(double widthInPixels) {
+            if (widthInPixels > 0) {
+                return (OBJECT_WIDTH_IN_REAL_WORLD_UNITS * FOCAL_LENGTH) / widthInPixels; //  tinh khoang cach
+            }
+            return 0;
+        }
     }
 }

@@ -171,4 +171,59 @@ public class openCV extends LinearOpMode {
             return 0;
         }
     }
+    static class RealTimeProcessingPipeline extends OpenCvPipeline {
+        @Override
+        public Mat processFrame(Mat input) {
+            // chuyen anh sang mau xam
+            Mat gray = new Mat();
+            Imgproc.cvtColor(input, gray, Imgproc.COLOR_BGR2GRAY);
+
+            // chuyen anh sang nhi phan
+            Mat binary = new Mat();
+            Imgproc.threshold(gray, binary, 50, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
+
+            // xac dinh duong vien trong anh nhi phan
+            Mat hierarchy = new Mat();
+            java.util.List<MatOfPoint> contours = new java.util.ArrayList<>();
+            Imgproc.findContours(binary, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_NONE);
+
+            for (MatOfPoint contour : contours) {
+                // tinh dien tich duong vien
+                double area = Imgproc.contourArea(contour);
+
+                // bo doi tuong qua nho hoac qua lon
+                if (area < 3700 || area > 100000) {
+                    continue;
+                }
+
+                // xâc dinh hcn xoay
+                RotatedRect rect = Imgproc.minAreaRect(new MatOfPoint2f(contour.toArray()));
+                Point[] boxPoints = new Point[4];
+                rect.points(boxPoints);
+
+                // xac dinh thong so hcn xoay
+                Point center = rect.center;
+                double width = rect.size.width;
+                double height = rect.size.height;
+                double angle = rect.angle;
+
+                // dieu chinh goc xoay trong 0--180 do
+                if (width < height) {
+                    angle = 90 - angle;
+                } else {
+                    angle = -angle;
+                }
+
+                // in ket qua len khung hinh
+                for (int i = 0; i < 4; i++) {
+                    Imgproc.line(input, boxPoints[i], boxPoints[(i + 1) % 4], new Scalar(0, 0, 255), 2);
+                }
+                Imgproc.putText(input, "Rotation Angle: " + (int) angle + " degrees",
+                        new Point(center.x - 50, center.y),
+                        Imgproc.FONT_HERSHEY_SIMPLEX, 0.7, new Scalar(0, 255, 0), 2);
+            }
+
+            return input;
+        }
+    }
 }

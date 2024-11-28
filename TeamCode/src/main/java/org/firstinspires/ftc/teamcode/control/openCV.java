@@ -136,17 +136,15 @@ public class openCV extends LinearOpMode {
                 Moments moments = Imgproc.moments(largestContour);
                 double cX = moments.get_m10() / moments.get_m00(); // toa do tam x
                 double cY = moments.get_m01() / moments.get_m00(); // toa do tam y
-                double detectedWidth = calculateWidth(largestContour); // chieu rong phan tu
+
 
                 // chu thich
                 Imgproc.drawContours(input, contours, contours.indexOf(largestContour), color, 2);
                 Imgproc.circle(input, new Point(cX, cY), 5, color, -1);
 
-                String widthLabel = label + " Width: " + (int) detectedWidth + " px";
                 String distanceLabel = label + " Distance: " +
-                        String.format(Locale.US, "%.2f", calculateDistance(detectedWidth)) + " in";
+                        String.format(Locale.US, "%.2f", calculateDistance(Imgproc.boundingRect(largestContour).width)) + " in";
 
-                Imgproc.putText(input, widthLabel, new Point(cX + 10, cY + 20), Imgproc.FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
                 Imgproc.putText(input, distanceLabel, new Point(cX + 10, cY + 50), Imgproc.FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
             }
         }
@@ -164,11 +162,6 @@ public class openCV extends LinearOpMode {
             }
 
             return largestContour;
-        }
-
-        private double calculateWidth(MatOfPoint contour) {
-            Rect boundingRect = Imgproc.boundingRect(contour);
-            return boundingRect.width; // tra ve chieu rong hcn bao quanh
         }
 
         private double calculateDistance(double widthInPixels) {

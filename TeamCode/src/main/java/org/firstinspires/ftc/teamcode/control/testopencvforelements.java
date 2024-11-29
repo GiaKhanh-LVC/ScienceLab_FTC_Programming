@@ -26,13 +26,13 @@ public class testopencvforelements  extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-        // Khởi tạo webcam
+        // khoi tao webcam
         int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
                 "cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
         webcam = OpenCvCameraFactory.getInstance().createWebcam(
                 hardwareMap.get(WebcamName.class, "Webcam 1"), cameraMonitorViewId);
 
-        // Gán pipeline xử lý khung hình
+        // gan pipline xu li khung hinh
         webcam.setPipeline(new IntegratedPipeline());
         webcam.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
             @Override
@@ -55,7 +55,7 @@ public class testopencvforelements  extends LinearOpMode {
             telemetry.update();
         }
 
-        // Dừng camera sau khi kết thúc
+        // dung camera khi ket thuc
         webcam.stopStreaming();
     }
 
@@ -69,13 +69,13 @@ public class testopencvforelements  extends LinearOpMode {
 
         @Override
         public Mat processFrame(Mat input) {
-            // Chuyển đổi ảnh sang HSV để xử lý màu
+            // chuyen doi sang HSV de xu li mau
             Imgproc.cvtColor(input, hsvFrame, Imgproc.COLOR_BGR2HSV);
             processColor(input, hsvFrame, new Scalar(20, 100, 100), new Scalar(30, 255, 255), new Scalar(0, 255, 255), "Yellow");
             processColor(input, hsvFrame, new Scalar(100, 150, 100), new Scalar(130, 255, 255), new Scalar(255, 0, 0), "Blue");
             processRedColor(input, hsvFrame);
 
-            // Phát hiện hình chữ nhật xoay
+            // phat hien hinh chu nhat xoay
             detectRotatedRectangles(input);
 
             return input;
@@ -118,11 +118,11 @@ public class testopencvforelements  extends LinearOpMode {
         }
 
         private void detectRotatedRectangles(Mat input) {
-            // Chuyển ảnh sang mức xám và nhị phân
+            // chuyen doi anh sang muc xam nhi phan
             Imgproc.cvtColor(input, gray, Imgproc.COLOR_BGR2GRAY);
             Imgproc.threshold(gray, binary, 50, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
 
-            // Tìm các đường viền
+            // tim duong vien
             List<MatOfPoint> contours = new ArrayList<>();
             Mat hierarchy = new Mat();
             Imgproc.findContours(binary, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_NONE);

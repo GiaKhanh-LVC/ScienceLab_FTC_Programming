@@ -18,43 +18,36 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-@TeleOp(name = "OpenCV - Real Time Processing", group = "Experimental")
+@TeleOp(name = "OpenCV - Multi-Color Detection", group = "Experimental")
 public class openCV extends LinearOpMode {
 
-    // Camera configuration
+    // config camera
     private static final int CAMERA_WIDTH = 1280;
     private static final int CAMERA_HEIGHT = 720;
-
-    // Object detection constants
-    private static final double OBJECT_WIDTH_IN_REAL_WORLD_UNITS = 89 * 0.03937; // Convert mm to inches
-    private static final double FOCAL_LENGTH = 700; // Camera focal length (arbitrary example)
 
     private OpenCvCamera webcam;
 
     @Override
     public void runOpMode() {
-        // Initialize camera
+        // init camera
         initializeOpenCv();
 
         // Setup telemetry and dashboard
         FtcDashboard dashboard = FtcDashboard.getInstance();
         telemetry = new MultipleTelemetry(telemetry, dashboard.getTelemetry());
-        dashboard.startCameraStream(webcam, 30); // Stream video to FTC Dashboard
+        dashboard.startCameraStream(webcam, 30); // Stream video toi FTC Dashboard
 
         waitForStart();
 
-        // Main loop
+        // vong lap chinh
         while (opModeIsActive()) {
             telemetry.update();
         }
 
-        // Cleanup resources
+        // clean du lieu khi dung
         webcam.stopStreaming();
     }
-
-    /**
-     * Initialize OpenCV and setup the camera.
-     */
+    // init camera
     private void initializeOpenCv() {
         int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
                 "cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
@@ -62,7 +55,7 @@ public class openCV extends LinearOpMode {
         webcam = OpenCvCameraFactory.getInstance().createWebcam(
                 hardwareMap.get(WebcamName.class, "Webcam 1"), cameraMonitorViewId);
 
-        webcam.setPipeline(new MultiColorBlobDetectionPipeline());
+        webcam.setPipeline(new MultiColorDetectionPipeline());
         webcam.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
             @Override
             public void onOpened() {
@@ -77,34 +70,30 @@ public class openCV extends LinearOpMode {
         });
     }
 
-    /**
-     * Pipeline for real-time multi-color blob detection and distance estimation.
-     */
-    static class MultiColorBlobDetectionPipeline extends OpenCvPipeline {
-
-        private Point yellowCenter = null;
-        private double yellowDistance = 0.0;
-
-        public Point getYellowCenter() {
-            return yellowCenter;
-        }
-
-        public double getYellowDistance() {
-            return yellowDistance;
-        }
+   // su dung pipline de xu li mau va tinh toan toa do, huong cua vat the
+    static class MultiColorDetectionPipeline extends OpenCvPipeline {
 
         @Override
         public Mat processFrame(Mat input) {
-            // Preprocess and detect yellow blobs
+            // xu li mau vang
             Mat yellowMask = preprocessFrame(input, new Scalar(20, 100, 100), new Scalar(30, 255, 255));
-            processColor(input, yellowMask, new Scalar(0, 255, 255), "Yellow");
+            processColorAndOrientation(input, yellowMask, new Scalar(0, 255, 255), "Yellow");
+
+            // xu li mau do (mau do co hai dai mau HSV)
+            Mat redMask1 = preprocessFrame(input, new Scalar(0, 120, 100), new Scalar(10, 255, 255));
+            Mat redMask2 = preprocessFrame(input, new Scalar(170, 120, 100), new Scalar(180, 255, 255));
+            Mat redMask = new Mat();
+            Core.addWeighted(redMask1, 1.0, redMask2, 1.0, 0.0, redMask);
+            processColorAndOrientation(input, redMask, new Scalar(0, 0, 255), "Red");
+
+            // xu li mau xanh nuoc bien
+            Mat blueMask = preprocessFrame(input, new Scalar(100, 150, 100), new Scalar(130, 255, 255));
+            processColorAndOrientation(input, blueMask, new Scalar(255, 0, 0), "Blue");
 
             return input;
         }
 
-        /**
-         * Preprocess the input frame for a specific color range.
-         */
+        // tien xu li dau vao va cho mot dai mau cu the
         private Mat preprocessFrame(Mat frame, Scalar lowerBound, Scalar upperBound) {
             Mat hsvFrame = new Mat();
             Imgproc.cvtColor(frame, hsvFrame, Imgproc.COLOR_BGR2HSV);
@@ -112,40 +101,42 @@ public class openCV extends LinearOpMode {
             Mat mask = new Mat();
             Core.inRange(hsvFrame, lowerBound, upperBound, mask);
 
+            // xu li va lam sach mask
             Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5));
-            Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN, kernel); // Noise reduction
-            Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel); // Smoothing
+            Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN, kernel); // khu nhieu
+            Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel); // lam muot
 
             return mask;
         }
 
         /**
-         * Process detected color mask and annotate the frame with results.
+         * Process detected color mask and compute orientation.
          */
-        private void processColor(Mat input, Mat mask, Scalar color, String label) {
+        private void processColorAndOrientation(Mat input, Mat mask, Scalar color, String label) {
             List<MatOfPoint> contours = new ArrayList<>();
             Imgproc.findContours(mask, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
 
             MatOfPoint largestContour = findLargestContour(contours);
             if (largestContour != null) {
-                Moments moments = Imgproc.moments(largestContour);
-                yellowCenter = new Point(moments.get_m10() / moments.get_m00(), moments.get_m01() / moments.get_m00());
-                yellowDistance = calculateDistance(Imgproc.boundingRect(largestContour).width);
-
-                // Annotate the frame
+                // Draw contours
                 Imgproc.drawContours(input, contours, contours.indexOf(largestContour), color, 2);
-                Imgproc.circle(input, yellowCenter, 5, color, -1);
 
-                String distanceLabel = label + " Distance: " +
-                        String.format(Locale.US, "%.2f", yellowDistance) + " in";
-                Imgproc.putText(input, distanceLabel, new Point(yellowCenter.x + 10, yellowCenter.y + 50),
+                // Compute orientation
+                getOrientation(largestContour, input);
+
+                // Compute center and annotate distance
+                Moments moments = Imgproc.moments(largestContour);
+                Point center = new Point(moments.get_m10() / moments.get_m00(), moments.get_m01() / moments.get_m00());
+                Imgproc.circle(input, center, 5, color, -1);
+
+                String centerLabel = label + " Center: (" +
+                        String.format(Locale.US, "%.1f, %.1f", center.x, center.y) + ")";
+                Imgproc.putText(input, centerLabel, new Point(center.x + 10, center.y + 50),
                         Imgproc.FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
             }
         }
 
-        /**
-         * Find the largest contour from the given list of contours.
-         */
+       // tim vien vat the lon nhat va ve duong vien
         private MatOfPoint findLargestContour(List<MatOfPoint> contours) {
             double maxArea = 0;
             MatOfPoint largestContour = null;
@@ -161,14 +152,52 @@ public class openCV extends LinearOpMode {
             return largestContour;
         }
 
-        /**
-         * Calculate the distance to an object based on its width in pixels.
-         */
-        private double calculateDistance(double widthInPixels) {
-            if (widthInPixels > 0) {
-                return (OBJECT_WIDTH_IN_REAL_WORLD_UNITS * FOCAL_LENGTH) / widthInPixels;
-            }
-            return 0;
+       // tinh toan huong cua vat the su dung PCA và chu thich len anh
+        private void getOrientation(MatOfPoint contour, Mat input) {
+            MatOfPoint2f contour2f = new MatOfPoint2f(contour.toArray());
+
+            // Perform PCA
+            Mat mean = new Mat();
+            Mat eigenvectors = new Mat();
+            Mat eigenvalues = new Mat();
+            Core.PCACompute2(new MatOfPoint2f(contour2f), mean, eigenvectors, eigenvalues);
+
+            Point center = new Point(mean.get(0, 0)[0], mean.get(0, 0)[1]);
+
+            // Draw the center point
+            Imgproc.circle(input, center, 3, new Scalar(255, 0, 255), 2);
+
+            // Principal axes
+            double scale = 0.02;
+            Point p1 = new Point(
+                    center.x + scale * eigenvectors.get(0, 0)[0] * eigenvalues.get(0, 0)[0],
+                    center.y + scale * eigenvectors.get(0, 1)[0] * eigenvalues.get(0, 0)[0]);
+            Point p2 = new Point(
+                    center.x - scale * eigenvectors.get(1, 0)[0] * eigenvalues.get(1, 0)[0],
+                    center.y - scale * eigenvectors.get(1, 1)[0] * eigenvalues.get(1, 0)[0]);
+
+            drawAxis(input, center, p1, new Scalar(255, 255, 0), 1);
+            drawAxis(input, center, p2, new Scalar(0, 0, 255), 5);
+
+            double angle = Math.atan2(eigenvectors.get(0, 1)[0], eigenvectors.get(0, 0)[0]);
+
+            // Add label with rotation angle
+            String label = "Rotation Angle: " + String.format("%.2f", Math.toDegrees(angle)) + " degrees";
+            Imgproc.putText(input, label, new Point(center.x + 10, center.y - 10),
+                    Imgproc.FONT_HERSHEY_SIMPLEX, 0.5, new Scalar(255, 255, 255), 1, Imgproc.LINE_AA);
+        }
+
+        private void drawAxis(Mat img, Point p, Point q, Scalar color, int scale) {
+            Imgproc.line(img, p, q, color, 2);
+
+            double angle = Math.atan2(p.y - q.y, p.x - q.x);
+            Point hook1 = new Point(q.x + scale * 10 * Math.cos(angle + Math.PI / 4),
+                    q.y + scale * 10 * Math.sin(angle + Math.PI / 4));
+            Point hook2 = new Point(q.x + scale * 10 * Math.cos(angle - Math.PI / 4),
+                    q.y + scale * 10 * Math.sin(angle - Math.PI / 4));
+
+            Imgproc.line(img, q, hook1, color, 2);
+            Imgproc.line(img, q, hook2, color, 2);
         }
     }
 }
